@@ -14,3 +14,6 @@ dist/
 build/
 coverage/
 .nyc_output/
+
+clean-db.js
+seed_departments.js

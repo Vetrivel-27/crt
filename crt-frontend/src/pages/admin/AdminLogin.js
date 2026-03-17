@@ -12,19 +12,16 @@ const AdminLogin = () => {
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
-        setError('');
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const result = await login(formData.email, formData.password);
+        setError('');
+        const result = await login(formData.email, formData.password, 'admin');
 
-        if (result.success && result.user.role === 'admin') {
+        if (result.success) {
             navigate('/admin/dashboard');
-        } else if (result.success) {
-            setError('This login is for administrators only.');
-            setLoading(false);
         } else {
             setError(result.message);
             setLoading(false);
@@ -53,7 +50,7 @@ const AdminLogin = () => {
                     </button>
                 </form>
                 <div className="login-footer">
-                    <p><Link to="/student/login">Student Login</Link> | <Link to="/worker/login">Worker Login</Link></p>
+                    <p><Link to="/login">Student Login</Link> | <Link to="/worker/login">Worker Login</Link></p>
                 </div>
             </div>
         </div>

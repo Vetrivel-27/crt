@@ -170,3 +170,70 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Auto-Correction Banner ─────────────────────────────────────── */
+.auto-correction-banner {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: flex-start;
+    background: #fff8e6;
+    border: 1px solid #f0c040;
+    border-left: 4px solid #d4a017;
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.auto-correction-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.auto-correction-content strong {
+    color: #7a5a00;
+    display: block;
+    margin-bottom: var(--spacing-xs);
+}
+
+.auto-correction-content > p {
+    color: #8a6800;
+    font-size: 0.9rem;
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.correction-comparison {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: var(--spacing-sm);
+}
+
+.comparison-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.875rem;
+}
+
+.comparison-field {
+    font-weight: 600;
+    color: #7a5a00;
+    width: 65px;
+    flex-shrink: 0;
+}
+
+.comparison-original {
+    text-decoration: line-through;
+    color: var(--text-tertiary);
+}
+
+.comparison-arrow {
+    color: #d4a017;
+    font-weight: bold;
+}
+
+.comparison-corrected {
+    color: #2d6a35;
+    font-weight: 600;
+}

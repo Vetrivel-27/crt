@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const studentRoutes = require('./routes/student');
 const workerRoutes = require('./routes/worker');
 const adminRoutes = require('./routes/admin');
+const { initCronJobs } = require('./services/cronService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,6 +43,11 @@ app.use('/api/student', studentRoutes);
 app.use('/api/worker', workerRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Initialize Background Workers
+if (process.env.NODE_ENV !== 'test') {
+    initCronJobs();
+}
+
 // 404 handler
 app.use(notFoundHandler);
 
@@ -51,7 +57,7 @@ app.use(errorHandler);
 // Start server
 app.listen(PORT, () => {
     console.log('='.repeat(50));
-    console.log('🚀 Complaint Resolution Tracker API');
+    console.log('Complaint Resolution Tracker');
     console.log('='.repeat(50));
     console.log(`✓ Server running on port ${PORT}`);
     console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);

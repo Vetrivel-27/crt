@@ -103,7 +103,12 @@ const WorkerDashboard = () => {
                         <Link key={c.id} to={`/worker/complaints/${c.id}`} className="worker-complaint-card card">
                             <div className="complaint-card-header">
                                 <div>
-                                    <h3>{c.title}</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                                        {c.is_escalated && (
+                                            <span className="badge badge-error" style={{ fontSize: '0.6rem', padding: '2px 6px', background: '#dc3545', color: 'white' }}>ESCALATED</span>
+                                        )}
+                                        <h3>{c.title}</h3>
+                                    </div>
                                     <p className="student-info">
                                         Student: {c.student_name} ({c.student_id || c.student_email})
                                     </p>

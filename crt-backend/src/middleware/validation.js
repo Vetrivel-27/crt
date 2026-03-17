@@ -68,6 +68,9 @@ const createComplaintValidation = [
     body('urgency')
         .optional()
         .isIn(['low', 'medium', 'high', 'critical']).withMessage('Invalid urgency level'),
+    body('customFields')
+        .optional()
+        .isObject().withMessage('Custom fields must be an object'),
     validate
 ];
 
@@ -129,7 +132,7 @@ const createUserValidation = [
         .isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
     body('role')
         .notEmpty().withMessage('Role is required')
-        .isIn(['student', 'worker', 'admin']).withMessage('Invalid role'),
+        .isIn(['student', 'worker', 'admin', 'department_head']).withMessage('Invalid role'),
     body('department')
         .optional()
         .trim(),

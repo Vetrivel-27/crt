@@ -5,22 +5,46 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 
 const AdminDashboard = () => {
     const [overview, setOverview] = useState(null);
+    const [workers, setWorkers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [selectedComplaint, setSelectedComplaint] = useState(null);
+    const [assignWorkerId, setAssignWorkerId] = useState('');
 
     useEffect(() => {
-        fetchOverview();
+        fetchData();
     }, []);
 
-    const fetchOverview = async () => {
+    const fetchData = async () => {
         try {
-            const response = await apiService.getAdminOverview();
-            setOverview(response.data.data);
+            const [overviewRes, workersRes] = await Promise.all([
+                apiService.getAdminOverview(),
+                apiService.getAllUsers({ role: 'worker,department_head' })
+            ]);
+            setOverview(overviewRes.data.data);
+            setWorkers(workersRes.data.data.users);
         } catch (err) {
             setError('Failed to load dashboard data');
             console.error(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleQuickAssign = async (complaintId) => {
+        if (!assignWorkerId) {
+            alert('Please select a worker');
+            return;
+        }
+        try {
+            await apiService.assignComplaint(complaintId, { workerId: assignWorkerId });
+            await fetchData();
+            setSelectedComplaint(null);
+            setAssignWorkerId('');
+            alert('Complaint assigned successfully!');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to assign complaint');
         }
     };
 
@@ -92,60 +116,54 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {/* AI Insights */}
-            {/*<div className="card" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                <h3 style={{ marginBottom: 'var(--spacing-md)' }}>🤖 AI-Generated Insights</h3>
-                <ul style={{ paddingLeft: 'var(--spacing-lg)' }}>
-                    {overview.aiInsights.map((insight, i) => (
-                        <li key={i} style={{ marginBottom: 'var(--spacing-sm)', color: 'var(--text-secondary)' }}>{insight}</li>
-                    ))}
-                </ul>
-            </div>
-            */}
-            {/* AI Recommendations */}
-            {/*{overview.aiRecommendations && overview.aiRecommendations.length > 0 && (
-                <div className="card" style={{ marginBottom: 'var(--spacing-xl)', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-                    <h3 style={{ marginBottom: 'var(--spacing-md)', color: 'white' }}>💡 Recommendations</h3>
-                    <ul style={{ paddingLeft: 'var(--spacing-lg)' }}>
-                        {overview.aiRecommendations.map((rec, i) => (
-                            <li key={i} style={{ marginBottom: 'var(--spacing-sm)' }}>{rec}</li>
-                        ))}
-                    </ul>
-                </div>
-            )}*/}
-
             {/* Recent Complaints */}
-            <div className="card" style={{ marginBottom: 'var(--spacing-xl)' }}>
-                <h3 style={{ marginBottom: 'var(--spacing-md)' }}>Recent Complaints</h3>
-                <div style={{ overflowX: 'auto' }}>
+            <div className="card" style={{ marginBottom: 'var(--spacing-xl)', padding: 0 }}>
+                <h3 style={{ padding: 'var(--spacing-md)', margin: 0, borderBottom: '1px solid var(--border-color)' }}>Recent Complaints</h3>
+                <div style={{ height: '400px', overflowY: 'auto', padding: '0 var(--spacing-sm)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
+                        <thead style={{ position: 'sticky', top: 0, background: 'var(--bg-primary)', zIndex: 1 }}>
                             <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                                <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>ID</th>
+                                <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>#</th>
                                 <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Title</th>
                                 <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Student</th>
-                                <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Category</th>
-                                <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Status</th>
+                                <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Date</th>
                                 <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Urgency</th>
                                 <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Worker</th>
+                                <th style={{ padding: 'var(--spacing-sm)', textAlign: 'left' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {overview.recentComplaints.map((complaint) => (
                                 <tr key={complaint.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                    <td style={{ padding: 'var(--spacing-sm)' }}>#{complaint.id}</td>
-                                    <td style={{ padding: 'var(--spacing-sm)' }}>{complaint.title}</td>
-                                    <td style={{ padding: 'var(--spacing-sm)' }}>{complaint.student_name}</td>
-                                    <td style={{ padding: 'var(--spacing-sm)' }}>{complaint.category}</td>
-                                    <td style={{ padding: 'var(--spacing-sm)' }}>
-                                        <span className={`badge badge-${complaint.status}`}>
-                                            {complaint.status.replace('_', ' ')}
-                                        </span>
+                                    <td style={{ padding: 'var(--spacing-sm)', fontSize: '0.85rem' }}>{complaint.id}</td>
+                                    <td style={{ padding: 'var(--spacing-sm)', fontSize: '0.9rem', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={complaint.title}>
+                                        {complaint.is_escalated && (
+                                            <span className="badge badge-error" style={{ fontSize: '0.65rem', marginRight: 'var(--spacing-xs)', background: '#dc3545', color: 'white' }}>ESCALATED</span>
+                                        )}
+                                        {complaint.title}
+                                    </td>
+                                    <td style={{ padding: 'var(--spacing-sm)', fontSize: '0.85rem' }}>{complaint.student_name}</td>
+                                    <td style={{ padding: 'var(--spacing-sm)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                        {new Date(complaint.created_at).toLocaleDateString()}
                                     </td>
                                     <td style={{ padding: 'var(--spacing-sm)' }}>
-                                        <span className={`badge badge-${complaint.urgency}`}>{complaint.urgency}</span>
+                                        <span className={`badge badge-${complaint.urgency}`} style={{ fontSize: '0.7rem' }}>{complaint.urgency}</span>
                                     </td>
-                                    <td style={{ padding: 'var(--spacing-sm)' }}>{complaint.worker_name || 'Unassigned'}</td>
+                                    <td style={{ padding: 'var(--spacing-sm)', fontSize: '0.85rem' }}>
+                                        {complaint.worker_name || 'Unassigned'}
+                                    </td>
+                                    <td style={{ padding: 'var(--spacing-sm)' }}>
+                                        <button 
+                                            className="btn-small btn-primary" 
+                                            style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                                            onClick={() => {
+                                                setSelectedComplaint(complaint);
+                                                setAssignWorkerId(complaint.assigned_worker_id || '');
+                                            }}
+                                        >
+                                            Assign
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -155,13 +173,44 @@ const AdminDashboard = () => {
 
             {/* Quick Actions */}
             <div style={{ display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' }}>
-                <Link to="/admin/complaints" className="btn btn-primary">
-                    Manage All Complaints
-                </Link>
                 <Link to="/admin/users" className="btn btn-secondary">
                     Manage Users
                 </Link>
             </div>
+
+            {/* Quick Assign Modal */}
+            {selectedComplaint && (
+                <div className="modal-overlay" onClick={() => setSelectedComplaint(null)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h3>Quick Assign #{selectedComplaint.id}</h3>
+                        <p><strong>Title:</strong> {selectedComplaint.title}</p>
+                        <div className="form-group" style={{ marginBottom: 'var(--spacing-md)' }}>
+                            <label className="label">Select Staff</label>
+                            <select
+                                className="input"
+                                value={assignWorkerId}
+                                onChange={(e) => setAssignWorkerId(e.target.value)}
+                                style={{ width: '100%', padding: 'var(--spacing-sm)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}
+                            >
+                                <option value="">-- Select Worker/Head --</option>
+                                {workers.map((worker) => (
+                                    <option key={worker.id} value={worker.id}>
+                                        {worker.name} ({worker.department || 'No Dept'}) - {worker.role}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="modal-actions">
+                            <button className="btn btn-outline" onClick={() => setSelectedComplaint(null)}>
+                                Cancel
+                            </button>
+                            <button className="btn btn-primary" onClick={() => handleQuickAssign(selectedComplaint.id)}>
+                                Assign
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

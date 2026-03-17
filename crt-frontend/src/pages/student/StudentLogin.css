@@ -49,6 +49,28 @@
     flex-direction: column;
 }
 
+.btn-resend {
+    background: none;
+    border: 1px solid #a8201a;
+    color: #a8201a;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    margin-top: 2px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-resend:hover:not(:disabled) {
+    background: #a8201a;
+    color: white;
+}
+
+.btn-resend:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 .btn-block {
     width: 100%;
     justify-content: center;

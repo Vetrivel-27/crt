@@ -83,10 +83,16 @@ const StudentDashboard = () => {
             {complaints.length === 0 ? (
                 <div className="empty-state card">
                     <h3>No complaints found</h3>
-                    <p>You haven't submitted any complaints yet.</p>
-                    <Link to="/student/complaints/new" className="btn btn-primary mt-2">
-                        Submit Your First Complaint
-                    </Link>
+                    {filter === 'all' ? (
+                        <>
+                            <p>You haven't submitted any complaints yet.</p>
+                            <Link to="/student/complaints/new" className="btn btn-primary mt-2">
+                                Submit Your First Complaint
+                            </Link>
+                        </>
+                    ) : (
+                        <p>No complaints currently in <strong>{filter.replace('_', ' ')}</strong> status.</p>
+                    )}
                 </div>
             ) : (
                 <div className="complaints-grid">
@@ -97,7 +103,12 @@ const StudentDashboard = () => {
                             className="complaint-card card"
                         >
                             <div className="complaint-header">
-                                <h3>{complaint.title}</h3>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                                    {complaint.is_escalated && (
+                                        <span className="badge badge-error" style={{ fontSize: '0.6rem', padding: '2px 6px', background: '#dc3545', color: 'white' }}>ESCALATED</span>
+                                    )}
+                                    <h3>{complaint.title}</h3>
+                                </div>
                                 <StatusBadge status={complaint.status} />
                             </div>
 

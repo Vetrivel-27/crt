@@ -10,6 +10,7 @@ import StudentRegister from './pages/student/StudentRegister';
 import StudentDashboard from './pages/student/StudentDashboard';
 import NewComplaint from './pages/student/NewComplaint';
 import ComplaintDetail from './pages/student/ComplaintDetail';
+import VerifyEmail from './pages/student/VerifyEmail';
 
 // Worker pages
 import WorkerLogin from './pages/worker/WorkerLogin';
@@ -32,12 +33,13 @@ function App() {
       <Routes>
         {/* Landing/Login Routes */}
         <Route path="/" element={
-          user ? <Navigate to={`/${user.role}/dashboard`} replace /> : <Navigate to="/student/login" replace />
+          user ? <Navigate to={`/${user.role}/dashboard`} replace /> : <Navigate to="/login" replace />
         } />
 
         {/* Student Routes */}
-        <Route path="/student/login" element={<StudentLogin />} />
+        <Route path="/login" element={<StudentLogin />} />
         <Route path="/student/register" element={<StudentRegister />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/student/dashboard" element={
           <ProtectedRoute allowedRoles={['student']}>
             <StudentDashboard />

@@ -1,44 +1,51 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import apiService from '../../services/api';
 import './StudentLogin.css';
 
 const StudentLogin = () => {
-    const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-    });
+    const [formData, setFormData] = useState({ email: '', password: '' });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [unverifiedEmail, setUnverifiedEmail] = useState('');
+    const [resendStatus, setResendStatus] = useState('');
 
     const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
-        setError('');
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setUnverifiedEmail('');
+        setResendStatus('');
 
-        const result = await login(formData.email, formData.password);
+        const result = await login(formData.email, formData.password, 'student');
 
         if (result.success) {
-            if (result.user.role === 'student') {
-                navigate('/student/dashboard');
-            } else {
-                setError('This login is for students only. Please use the appropriate login page.');
-                setLoading(false);
-            }
+            navigate('/student/dashboard');
         } else {
+            // Special case: email not verified
+            if (result.code === 'EMAIL_NOT_VERIFIED') {
+                setUnverifiedEmail(formData.email);
+            }
             setError(result.message);
             setLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        setResendStatus('sending');
+        try {
+            await apiService.resendVerification(unverifiedEmail);
+            setResendStatus('sent');
+        } catch {
+            setResendStatus('error');
         }
     };
 
@@ -53,6 +60,26 @@ const StudentLogin = () => {
                 {error && (
                     <div className="error-banner">
                         {error}
+                        {unverifiedEmail && (
+                            <div style={{ marginTop: '10px' }}>
+                                {resendStatus === 'sent' ? (
+                                    <span style={{ color: '#2d6a35', fontWeight: 500 }}>
+                                        ✓ Verification email resent! Check your inbox.
+                                    </span>
+                                ) : (
+                                    <button
+                                        className="btn-resend"
+                                        onClick={handleResend}
+                                        disabled={resendStatus === 'sending'}
+                                    >
+                                        {resendStatus === 'sending' ? 'Sending...' : 'Resend verification email'}
+                                    </button>
+                                )}
+                                {resendStatus === 'error' && (
+                                    <span style={{ color: '#a8201a', marginLeft: '8px' }}>Failed to send. Try again.</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 

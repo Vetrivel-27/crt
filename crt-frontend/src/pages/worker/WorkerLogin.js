@@ -12,19 +12,16 @@ const WorkerLogin = () => {
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
-        setError('');
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const result = await login(formData.email, formData.password);
+        setError('');
+        const result = await login(formData.email, formData.password, ['worker', 'department_head']);
 
-        if (result.success && result.user.role === 'worker') {
+        if (result.success) {
             navigate('/worker/dashboard');
-        } else if (result.success) {
-            setError('This login is for workers only.');
-            setLoading(false);
         } else {
             setError(result.message);
             setLoading(false);
@@ -53,7 +50,7 @@ const WorkerLogin = () => {
                     </button>
                 </form>
                 <div className="login-footer">
-                    <p><Link to="/student/login">Student Login</Link> | <Link to="/admin/login">Admin Login</Link></p>
+                    <p><Link to="/login">Student Login</Link> | <Link to="/admin/login">Admin Login</Link></p>
                 </div>
             </div>
         </div>

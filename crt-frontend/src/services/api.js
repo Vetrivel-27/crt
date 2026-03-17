@@ -29,10 +29,14 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Token expired or invalid
+            // Only redirect if there was an existing token (expired session),
+            // NOT during a login attempt where 401 just means wrong credentials.
+            const hadToken = localStorage.getItem('token');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/';
+            if (hadToken) {
+                window.location.href = '/';
+            }
         }
         return Promise.reject(error);
     }
@@ -44,6 +48,8 @@ const apiService = {
     register: (data) => api.post('/auth/register', data),
     login: (data) => api.post('/auth/login', data),
     logout: () => api.post('/auth/logout'),
+    verifyEmail: (token) => api.get('/auth/verify-email', { params: { token } }),
+    resendVerification: (email) => api.post('/auth/resend-verification', { email }),
 
     // Student
     getStudentComplaints: (params) => api.get('/api/student/complaints', { params }),

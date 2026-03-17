@@ -62,15 +62,61 @@ const ComplaintDetail = () => {
 
             <div className="card">
                 <div className="complaint-detail-header">
-                    <h1>{complaint.title}</h1>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                        {complaint.is_escalated && (
+                            <span className="badge badge-error" style={{ background: '#dc3545', color: 'white' }}>ESCALATED</span>
+                        )}
+                        <h1>{complaint.title}</h1>
+                    </div>
                     <StatusBadge status={complaint.status} />
                 </div>
+
+                {complaint.is_escalated && (
+                    <div style={{ background: '#fff5f5', border: '1px solid #feb2b2', padding: 'var(--spacing-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-md)', color: '#c53030' }}>
+                        <strong>Priority Escalation:</strong> This issue has been automatically escalated because multiple similar reports were detected. Our department heads are prioritizing this resolution.
+                    </div>
+                )}
+
+                {/* Auto-correction banner */}
+                {complaint.auto_corrected && (
+                    <div className="auto-correction-banner">
+                        {/* <span className="auto-correction-icon">🤖</span> */}
+                        <div className="auto-correction-content">
+                            <strong>Automatically Adjusted</strong>
+                            <p>Some details were adjusted to better categorise your complaint.</p>
+                            <div className="correction-comparison">
+                                {complaint.student_selected_category && complaint.student_selected_category !== complaint.category && (
+                                    <div className="comparison-row">
+                                        <span className="comparison-field">Category:</span>
+                                        <span className="comparison-original">{complaint.student_selected_category}</span>
+                                        <span className="comparison-arrow">→</span>
+                                        <span className="comparison-corrected">{complaint.category}</span>
+                                    </div>
+                                )}
+                                {complaint.student_selected_urgency && complaint.student_selected_urgency !== complaint.urgency && (
+                                    <div className="comparison-row">
+                                        <span className="comparison-field">Urgency:</span>
+                                        <span className="comparison-original">{complaint.student_selected_urgency}</span>
+                                        <span className="comparison-arrow">→</span>
+                                        <span className="comparison-corrected">{complaint.urgency}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="complaint-meta-grid">
                     <div className="meta-item">
                         <strong>Category:</strong>
                         <span className="category-badge">{complaint.category}</span>
                     </div>
+                    {complaint.custom_fields?.hostelBlock && (
+                        <div className="meta-item">
+                            <strong>Hostel Block:</strong>
+                            <span>{complaint.custom_fields.hostelBlock}</span>
+                        </div>
+                    )}
                     <div className="meta-item">
                         <strong>Urgency:</strong>
                         <span className={`badge badge-${complaint.urgency}`}>{complaint.urgency}</span>
@@ -90,12 +136,12 @@ const ComplaintDetail = () => {
                     <p className="description-text">{complaint.description}</p>
                 </div>
 
-                {/*{complaint.ai_summary && (
+                {complaint.ai_summary && (
                     <div className="ai-summary-box">
-                        <h4>AI Summary</h4>
+                        <h4>Complaint Summary</h4>
                         <p>{complaint.ai_summary}</p>
                     </div>
-                )}*/}
+                )}
 
                 {complaint.assigned_worker_name && (
                     <div className="complaint-section">
@@ -114,6 +160,7 @@ const ComplaintDetail = () => {
                     </div>
                 )}
             </div>
+
 
             <div className="card mt-3">
                 <h3>Complaint History</h3>

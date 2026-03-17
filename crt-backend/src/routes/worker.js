@@ -3,25 +3,25 @@ const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
 const aiService = require('../services/aiService');
-const {
-    updateStatusValidation,
-    addNoteValidation,
-    idParamValidation,
-} = require('../middleware/validation');
+const { updateStatusValidation, addNoteValidation, idParamValidation } = require('../middleware/validation');
+const { sendComplaintResolvedEmail, sendWorkerAssignedEmail } = require('../services/emailService');
 
 const router = express.Router();
 
-// All routes require authentication and worker role
+// All routes require authentication and worker/department_head role
 router.use(authMiddleware);
-router.use(roleCheck(['worker']));
+router.use(roleCheck(['worker', 'department_head']));
 
 /**
  * GET /api/worker/complaints
- * Get all complaints assigned to the logged-in worker
+ * Get complaints (worker: assigned to them, head: escalated in their dept)
  */
 router.get('/complaints', async (req, res, next) => {
     try {
-        const workerId = req.user.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const userDept = req.user.department;
+        
         const { status, category, urgency } = req.query;
 
         let query = `
@@ -32,11 +32,20 @@ router.get('/complaints', async (req, res, next) => {
         s.student_id as student_id
       FROM complaints c
       JOIN users s ON c.student_id = s.id
-      WHERE c.assigned_worker_id = $1
+      WHERE 1=1
     `;
-        const params = [workerId];
-        let paramCount = 1;
+        const params = [];
+        let paramCount = 0;
 
+        if (userRole === 'worker') {
+            paramCount++;
+            query += ` AND c.assigned_worker_id = $${paramCount}`;
+            params.push(userId);
+        } else if (userRole === 'department_head') {
+            paramCount++;
+            query += ` AND c.assigned_department = $${paramCount} AND c.is_escalated = true`;
+            params.push(userDept);
+        }
         if (status) {
             paramCount++;
             query += ` AND c.status = $${paramCount}`;
@@ -77,34 +86,40 @@ router.get('/complaints', async (req, res, next) => {
  */
 router.get('/stats', async (req, res, next) => {
     try {
-        const workerId = req.user.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const userDept = req.user.department;
+
+        let whereClause = userRole === 'worker' 
+            ? 'WHERE assigned_worker_id = $1' 
+            : 'WHERE assigned_department = $1 AND is_escalated = true';
 
         // Get counts by status
         const statusResult = await db.query(
             `SELECT status, COUNT(*) as count 
        FROM complaints 
-       WHERE assigned_worker_id = $1 
+       ${whereClause} 
        GROUP BY status`,
-            [workerId]
+            [userRole === 'worker' ? userId : userDept]
         );
 
         // Get overdue complaints (open for more than 7 days)
         const overdueResult = await db.query(
             `SELECT COUNT(*) as count 
        FROM complaints 
-       WHERE assigned_worker_id = $1 
+       ${whereClause} 
        AND status IN ('open', 'in_progress')
        AND created_at < NOW() - INTERVAL '7 days'`,
-            [workerId]
+            [userRole === 'worker' ? userId : userDept]
         );
 
         // Get average resolution time
         const avgTimeResult = await db.query(
             `SELECT AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/86400) as avg_days
        FROM complaints 
-       WHERE assigned_worker_id = $1 
+       ${whereClause} 
        AND status = 'resolved'`,
-            [workerId]
+            [userRole === 'worker' ? userId : userDept]
         );
 
         const stats = {
@@ -132,7 +147,13 @@ router.get('/stats', async (req, res, next) => {
 router.get('/complaints/:id', idParamValidation, async (req, res, next) => {
     try {
         const complaintId = req.params.id;
-        const workerId = req.user.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const userDept = req.user.department;
+
+        let whereClause = userRole === 'worker' 
+            ? 'c.assigned_worker_id = $2' 
+            : 'c.assigned_department = $2 AND c.is_escalated = true';
 
         // Get complaint with student info
         const complaintResult = await db.query(
@@ -143,8 +164,8 @@ router.get('/complaints/:id', idParamValidation, async (req, res, next) => {
         s.student_id as student_id
        FROM complaints c
        JOIN users s ON c.student_id = s.id
-       WHERE c.id = $1 AND c.assigned_worker_id = $2`,
-            [complaintId, workerId]
+       WHERE c.id = $1 AND ${whereClause}`,
+            [complaintId, userRole === 'worker' ? userId : userDept]
         );
 
         if (complaintResult.rows.length === 0) {
@@ -205,13 +226,23 @@ router.get('/complaints/:id', idParamValidation, async (req, res, next) => {
 router.put('/complaints/:id/status', idParamValidation, updateStatusValidation, async (req, res, next) => {
     try {
         const complaintId = req.params.id;
-        const workerId = req.user.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const userDept = req.user.department;
         const { status, note, resolutionMessage } = req.body;
 
-        // Verify complaint is assigned to this worker
+        const whereClause = userRole === 'worker' 
+            ? 'assigned_worker_id = $2' 
+            : 'assigned_department = $2 AND is_escalated = true';
+
+        // Verify complaint is assigned to this worker/dept
         const complaintResult = await db.query(
-            'SELECT id, status as current_status FROM complaints WHERE id = $1 AND assigned_worker_id = $2',
-            [complaintId, workerId]
+            `SELECT c.id, c.status as current_status, c.title, c.resolution_message, 
+                    s.email as student_email, s.name as student_name 
+             FROM complaints c
+             JOIN users s ON c.student_id = s.id
+             WHERE c.id = $1 AND ${whereClause}`,
+            [complaintId, userRole === 'worker' ? userId : userDept]
         );
 
         if (complaintResult.rows.length === 0) {
@@ -238,15 +269,29 @@ router.put('/complaints/:id/status', idParamValidation, updateStatusValidation, 
         await db.query(
             `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, old_status, new_status, note, is_public) 
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [complaintId, workerId, 'status_change', oldStatus, status, note || `Status changed to ${status}`, true]
+            [complaintId, userId, 'status_change', oldStatus, status, note || `Status changed to ${status}`, true]
         );
 
-        // If resolved, log resolution
+        // If resolved, log resolution and send email to student
         if (status === 'resolved' && resolutionMessage) {
             await db.query(
                 `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, note, is_public) 
          VALUES ($1, $2, $3, $4, $5)`,
-                [complaintId, workerId, 'resolved', resolutionMessage, true]
+                [complaintId, userId, 'resolved', resolutionMessage, true]
+            );
+            
+            const studentInfo = {
+                name: complaintResult.rows[0].student_name,
+                email: complaintResult.rows[0].student_email
+            };
+            const complaintInfo = {
+                id: complaintId,
+                title: complaintResult.rows[0].title,
+                resolution_message: resolutionMessage
+            };
+            
+            sendComplaintResolvedEmail(studentInfo, complaintInfo).catch(err => 
+                console.error('Failed to send resolution email:', err)
             );
         }
 
@@ -267,13 +312,19 @@ router.put('/complaints/:id/status', idParamValidation, updateStatusValidation, 
 router.post('/complaints/:id/notes', idParamValidation, addNoteValidation, async (req, res, next) => {
     try {
         const complaintId = req.params.id;
-        const workerId = req.user.id;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const userDept = req.user.department;
         const { note, isPublic } = req.body;
 
-        // Verify complaint is assigned to this worker
+        const whereClause = userRole === 'worker' 
+            ? 'assigned_worker_id = $2' 
+            : 'assigned_department = $2 AND is_escalated = true';
+
+        // Verify complaint is assigned to this worker/dept
         const complaintResult = await db.query(
-            'SELECT id FROM complaints WHERE id = $1 AND assigned_worker_id = $2',
-            [complaintId, workerId]
+            `SELECT id FROM complaints WHERE id = $1 AND ${whereClause}`,
+            [complaintId, userRole === 'worker' ? userId : userDept]
         );
 
         if (complaintResult.rows.length === 0) {
@@ -288,7 +339,7 @@ router.post('/complaints/:id/notes', idParamValidation, addNoteValidation, async
             `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, note, is_public) 
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-            [complaintId, workerId, 'note_added', note, isPublic || false]
+            [complaintId, userId, 'note_added', note, isPublic || false]
         );
 
         res.status(201).json({
@@ -307,6 +358,10 @@ router.post('/complaints/:id/notes', idParamValidation, addNoteValidation, async
  */
 router.put('/complaints/:id/reassign', idParamValidation, async (req, res, next) => {
     try {
+        if (req.user.role !== 'worker') {
+            return res.status(403).json({ success: false, message: 'Only workers can reassign complaints' });
+        }
+
         const complaintId = req.params.id;
         const workerId = req.user.id;
         const { newWorkerId, reason } = req.body;
@@ -320,7 +375,7 @@ router.put('/complaints/:id/reassign', idParamValidation, async (req, res, next)
 
         // Verify complaint is assigned to this worker
         const complaintResult = await db.query(
-            'SELECT id FROM complaints WHERE id = $1 AND assigned_worker_id = $2',
+            'SELECT id, title, urgency, category FROM complaints WHERE id = $1 AND assigned_worker_id = $2',
             [complaintId, workerId]
         );
 
@@ -333,7 +388,7 @@ router.put('/complaints/:id/reassign', idParamValidation, async (req, res, next)
 
         // Verify new worker exists
         const newWorkerResult = await db.query(
-            'SELECT id, name FROM users WHERE id = $1 AND role = $2',
+            'SELECT id, name, email FROM users WHERE id = $1 AND role = $2',
             [newWorkerId, 'worker']
         );
 

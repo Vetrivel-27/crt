@@ -10,8 +10,11 @@ const NewComplaint = () => {
         category: '',
         urgency: 'medium',
     });
+    const [customFields, setCustomFields] = useState({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [correction, setCorrection] = useState(null); // correction notice state
+    const [submittedId, setSubmittedId] = useState(null);
     const navigate = useNavigate();
 
     const categories = [
@@ -23,6 +26,8 @@ const NewComplaint = () => {
         'Fees & Finance',
         'Infrastructure',
         'Harassment & Discrimination',
+        'Health & Medical',
+        'Sports & Extracurricular',
         'General',
     ];
 
@@ -31,7 +36,20 @@ const NewComplaint = () => {
             ...formData,
             [e.target.name]: e.target.value,
         });
+        
+        // Reset custom fields if category changes
+        if (e.target.name === 'category') {
+            setCustomFields({});
+        }
+        
         setError('');
+    };
+
+    const handleCustomFieldChange = (e) => {
+        setCustomFields({
+            ...customFields,
+            [e.target.name]: e.target.value,
+        });
     };
 
     const handleSubmit = async (e) => {
@@ -40,14 +58,79 @@ const NewComplaint = () => {
         setError('');
 
         try {
-            await apiService.createComplaint(formData);
-            navigate('/student/dashboard');
+            const payload = { ...formData, customFields };
+            const response = await apiService.createComplaint(payload);
+            const { correction: corr, complaint } = response.data.data;
+
+            if (corr && corr.corrected) {
+                // Show correction notice before navigating
+                setCorrection(corr);
+                setSubmittedId(complaint.id);
+                setLoading(false);
+            } else {
+                navigate('/student/dashboard');
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to submit complaint');
             setLoading(false);
         }
     };
 
+    // ── Correction Notice Screen ─────────────────────────────────────────────
+    if (correction) {
+        return (
+            <div className="new-complaint-container">
+                <div className="new-complaint-card card">
+                    <div className="correction-notice">
+                        {/* <div className="correction-icon">🤖</div> */}
+                        <h2>Complaint Submitted!</h2>
+                        <p className="correction-intro">
+                            Your complaint was reviewed, and a small adjustment was made to its category or urgency to ensure
+                            it reaches the right team quickly.
+                        </p>
+
+                        <div className="correction-changes">
+                            {correction.changes.category && (
+                                <div className="correction-row">
+                                    <span className="correction-label">Category</span>
+                                    <span className="correction-from">{correction.changes.category.from}</span>
+                                    <span className="correction-arrow">→</span>
+                                    <span className="correction-to">{correction.changes.category.to}</span>
+                                </div>
+                            )}
+                            {correction.changes.urgency && (
+                                <div className="correction-row">
+                                    <span className="correction-label">Urgency</span>
+                                    <span className="correction-from">{correction.changes.urgency.from}</span>
+                                    <span className="correction-arrow">→</span>
+                                    <span className="correction-to correction-urgency">{correction.changes.urgency.to}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <p className="correction-reason">{correction.reason}</p>
+
+                        <div className="correction-actions">
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => navigate(`/student/complaints/${submittedId}`)}
+                            >
+                                View Complaint
+                            </button>
+                            <button
+                                className="btn btn-outline"
+                                onClick={() => navigate('/student/dashboard')}
+                            >
+                                Back to Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Normal Form ──────────────────────────────────────────────────────────
     return (
         <div className="new-complaint-container">
             <div className="new-complaint-card card">
@@ -87,6 +170,23 @@ const NewComplaint = () => {
                             ))}
                         </select>
                     </div>
+
+                    {/* Dynamic Fields */}
+                    {formData.category === 'Hostel & Accommodation' && (
+                        <div className="form-group slide-down">
+                            <label htmlFor="hostelBlock" className="label">Hostel Block *</label>
+                            <input
+                                type="text"
+                                id="hostelBlock"
+                                name="hostelBlock"
+                                className="input"
+                                value={customFields.hostelBlock || ''}
+                                onChange={handleCustomFieldChange}
+                                required
+                                placeholder="e.g. A-Block, B-Block"
+                            />
+                        </div>
+                    )}
 
                     <div className="form-group">
                         <label htmlFor="urgency" className="label">Urgency *</label>
@@ -141,3 +241,4 @@ const NewComplaint = () => {
 };
 
 export default NewComplaint;
+

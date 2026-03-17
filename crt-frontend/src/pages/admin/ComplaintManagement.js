@@ -20,7 +20,7 @@ const ComplaintManagement = () => {
         try {
             const [complaintsRes, usersRes] = await Promise.all([
                 apiService.getAllComplaints(filter),
-                apiService.getAllUsers({ role: 'worker' }),
+                apiService.getAllUsers({ role: 'worker,department_head' }),
             ]);
             setComplaints(complaintsRes.data.data.complaints);
             setWorkers(usersRes.data.data.users);
@@ -72,6 +72,7 @@ const ComplaintManagement = () => {
                 </div>
             </div>
 
+
             <div className="card">
                 <div className="table-container">
                     <table className="complaints-table">
@@ -92,7 +93,12 @@ const ComplaintManagement = () => {
                             {complaints.map((complaint) => (
                                 <tr key={complaint.id}>
                                     <td>#{complaint.id}</td>
-                                    <td className="title-cell">{complaint.title}</td>
+                                    <td className="title-cell">
+                                        {complaint.is_escalated && (
+                                            <span className="badge badge-error" style={{ fontSize: '0.65rem', marginRight: 'var(--spacing-xs)', background: '#dc3545', color: 'white' }}>ESCALATED</span>
+                                        )}
+                                        {complaint.title}
+                                    </td>
                                     <td>{complaint.student_name}</td>
                                     <td><span className="category-tag">{complaint.category}</span></td>
                                     <td><StatusBadge status={complaint.status} /></td>
@@ -122,6 +128,9 @@ const ComplaintManagement = () => {
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                         <h3>Assign Complaint #{selectedComplaint.id}</h3>
                         <p><strong>Title:</strong> {selectedComplaint.title}</p>
+                        {selectedComplaint.custom_fields?.hostelBlock && (
+                            <p><strong>Hostel Block:</strong> {selectedComplaint.custom_fields.hostelBlock}</p>
+                        )}
                         <div className="form-group">
                             <label className="label">Select Worker</label>
                             <select

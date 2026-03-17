@@ -26,10 +26,23 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = async (email, password) => {
+    const login = async (email, password, requiredRoles = null) => {
         try {
             const response = await apiService.login({ email, password });
             const { user: userData, token } = response.data.data;
+
+            // Enforce role check if required
+            if (requiredRoles) {
+                const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+                if (!roles.includes(userData.role)) {
+                    return {
+                        success: false,
+                        message: `Access denied. This login page is for ${roles.join(' and ')} only.`,
+                        code: 'WRONG_ROLE',
+                        user: userData // Return user so component can still see who tried but don't save to state
+                    };
+                }
+            }
 
             localStorage.setItem('user', JSON.stringify(userData));
             localStorage.setItem('token', token);
@@ -40,6 +53,7 @@ export const AuthProvider = ({ children }) => {
             return {
                 success: false,
                 message: error.response?.data?.message || 'Login failed',
+                code: error.response?.data?.code || null,
             };
         }
     };
@@ -47,13 +61,8 @@ export const AuthProvider = ({ children }) => {
     const register = async (data) => {
         try {
             const response = await apiService.register(data);
-            const { user: userData, token } = response.data.data;
-
-            localStorage.setItem('user', JSON.stringify(userData));
-            localStorage.setItem('token', token);
-            setUser(userData);
-
-            return { success: true, user: userData };
+            // Registration now sends a verification email — no auto-login
+            return { success: true, message: response.data.message };
         } catch (error) {
             return {
                 success: false,

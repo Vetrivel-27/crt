@@ -3,6 +3,9 @@ const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
 const aiService = require('../services/aiService');
+const { sendWorkerAssignedEmail } = require('../services/emailService');
+const { validateAndCorrectComplaint } = require('../services/complaintValidationService');
+const { checkEscalation } = require('../services/escalationService');
 const {
     createComplaintValidation,
     feedbackValidation,
@@ -71,38 +74,63 @@ router.get('/complaints', async (req, res, next) => {
 router.post('/complaints', createComplaintValidation, async (req, res, next) => {
     try {
         const studentId = req.user.id;
-        const { title, description, category, urgency } = req.body;
+        const { title, description, category, urgency, customFields } = req.body;
 
-        // Use AI to classify the complaint if urgency not provided
-        let finalUrgency = urgency || 'medium';
-        let finalCategory = category;
+        // Always run AI classification (regardless of what student selected)
+        const aiClassification = await aiService.classifyComplaint(description, { title });
 
-        if (!urgency || !category) {
-            const classification = await aiService.classifyComplaint(description, { title });
-            if (!category) finalCategory = classification.category;
-            if (!urgency) finalUrgency = classification.urgency;
-        }
+        // Validate and potentially override student selections
+        const validation = validateAndCorrectComplaint(
+            { category, urgency: urgency || 'medium' },
+            aiClassification
+        );
 
-        // Insert complaint
+        const {
+            finalCategory,
+            finalUrgency,
+            corrected,
+            changes,
+            reason,
+        } = validation;
+
+        // Insert complaint with final (possibly corrected) values
         const insertResult = await db.query(
-            `INSERT INTO complaints (student_id, title, description, category, urgency, status) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING *`,
-            [studentId, title, description, finalCategory, finalUrgency, 'open']
+            `INSERT INTO complaints
+                (student_id, title, description, category, urgency, status,
+                 auto_corrected, student_selected_category, student_selected_urgency, correction_reason, custom_fields)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING *`,
+            [
+                studentId, title, description, finalCategory, finalUrgency, 'open',
+                corrected,
+                corrected ? category : null,
+                corrected ? (urgency || 'medium') : null,
+                reason || null,
+                customFields || {},
+            ]
         );
 
         const complaint = insertResult.rows[0];
 
         // Log complaint creation in history
         await db.query(
-            `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, new_status, note) 
-       VALUES ($1, $2, $3, $4, $5)`,
+            `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, new_status, note)
+             VALUES ($1, $2, $3, $4, $5)`,
             [complaint.id, studentId, 'created', 'open', 'Complaint created']
         );
 
-        // Get available workers for routing
+        // Log auto-correction as a public note so student sees it in the timeline
+        if (corrected) {
+            await db.query(
+                `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, note, is_public)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [complaint.id, studentId, 'note_added', reason, true]
+            );
+        }
+
+        // Get available workers for routing (need email for notifications)
         const workersResult = await db.query(
-            `SELECT id, name, department FROM users WHERE role = 'worker'`
+            `SELECT id, name, email, department FROM users WHERE role = 'worker'`
         );
 
         // Use AI to suggest routing
@@ -111,21 +139,28 @@ router.post('/complaints', createComplaintValidation, async (req, res, next) => 
         // Update complaint with assignment if worker suggested
         if (routing.workerId) {
             await db.query(
-                `UPDATE complaints 
-         SET assigned_worker_id = $1, assigned_department = $2 
-         WHERE id = $3`,
+                `UPDATE complaints
+                 SET assigned_worker_id = $1, assigned_department = $2
+                 WHERE id = $3`,
                 [routing.workerId, routing.department, complaint.id]
             );
 
-            // Log assignment
             await db.query(
-                `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, note) 
-         VALUES ($1, $2, $3, $4)`,
+                `INSERT INTO complaint_history (complaint_id, actor_user_id, action_type, note)
+                 VALUES ($1, $2, $3, $4)`,
                 [complaint.id, studentId, 'assigned', routing.reason]
             );
 
             complaint.assigned_worker_id = routing.workerId;
             complaint.assigned_department = routing.department;
+            
+            // Send email to assigned worker
+            const workerInfo = workersResult.rows.find(w => w.id === routing.workerId);
+            if (workerInfo) {
+                sendWorkerAssignedEmail(workerInfo, complaint).catch(err => 
+                    console.error('Failed to send assignment email:', err)
+                );
+            }
         } else if (routing.department) {
             await db.query(
                 `UPDATE complaints SET assigned_department = $1 WHERE id = $2`,
@@ -133,16 +168,28 @@ router.post('/complaints', createComplaintValidation, async (req, res, next) => 
             );
             complaint.assigned_department = routing.department;
         }
+        
+        // Final Step: Ask the escalation service to check if this is a recurring issue
+        // It runs asynchronously and updates complaints in the background if threshold met
+        await checkEscalation(complaint);
 
         res.status(201).json({
             success: true,
             message: 'Complaint created successfully',
-            data: { complaint },
+            data: {
+                complaint,
+                correction: {
+                    corrected,
+                    changes,
+                    reason,
+                },
+            },
         });
     } catch (error) {
         next(error);
     }
 });
+
 
 /**
  * GET /api/complaints/:id

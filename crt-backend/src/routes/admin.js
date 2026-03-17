@@ -3,7 +3,9 @@ const bcrypt = require('bcrypt');
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
+const jwt = require('jsonwebtoken');
 const aiService = require('../services/aiService');
+const { sendWorkerWelcomeEmail, sendWorkerAssignedEmail, sendUserRemovedEmail } = require('../services/emailService');
 const {
     createUserValidation,
     idParamValidation,
@@ -60,14 +62,14 @@ router.get('/overview', async (req, res, next) => {
         // Get recent complaints
         const recentResult = await db.query(
             `SELECT 
-        c.id, c.title, c.category, c.status, c.urgency, c.created_at,
+        c.id, c.title, c.category, c.status, c.urgency, c.created_at, c.is_escalated,
         s.name as student_name,
         w.name as worker_name
        FROM complaints c
        JOIN users s ON c.student_id = s.id
        LEFT JOIN users w ON c.assigned_worker_id = w.id
        ORDER BY c.created_at DESC
-       LIMIT 10`
+       LIMIT 20`
         );
 
         // Get all complaints for AI analytics
@@ -117,7 +119,7 @@ router.get('/overview', async (req, res, next) => {
  */
 router.get('/complaints', async (req, res, next) => {
     try {
-        const { status, category, urgency, workerId, search } = req.query;
+        const { status, category, urgency, workerId, search, autoCorrected } = req.query;
 
         let query = `
       SELECT 
@@ -165,6 +167,10 @@ router.get('/complaints', async (req, res, next) => {
             params.push(`%${search}%`);
         }
 
+        if (autoCorrected === 'true') {
+            query += ` AND c.auto_corrected = true`;
+        }
+
         query += ' ORDER BY c.created_at DESC';
 
         const result = await db.query(query, params);
@@ -181,6 +187,7 @@ router.get('/complaints', async (req, res, next) => {
     }
 });
 
+
 /**
  * PUT /api/admin/complaints/:id/assign
  * Assign or reassign a complaint to a worker
@@ -192,7 +199,7 @@ router.put('/complaints/:id/assign', idParamValidation, async (req, res, next) =
 
         // Verify complaint exists
         const complaintResult = await db.query(
-            'SELECT id, assigned_worker_id FROM complaints WHERE id = $1',
+            'SELECT id, title, urgency, category, assigned_worker_id FROM complaints WHERE id = $1',
             [complaintId]
         );
 
@@ -205,17 +212,18 @@ router.put('/complaints/:id/assign', idParamValidation, async (req, res, next) =
 
         const oldWorkerId = complaintResult.rows[0].assigned_worker_id;
 
-        // If workerId provided, verify worker exists
+        let workerResult;
+        // If workerId provided, verify worker exists (could be worker or department_head)
         if (workerId) {
-            const workerResult = await db.query(
-                'SELECT id, name FROM users WHERE id = $1 AND role = $2',
-                [workerId, 'worker']
+            workerResult = await db.query(
+                'SELECT id, name, email FROM users WHERE id = $1 AND role IN ($2, $3)',
+                [workerId, 'worker', 'department_head']
             );
 
             if (workerResult.rows.length === 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid worker ID',
+                    message: 'Invalid worker/head ID',
                 });
             }
         }
@@ -233,6 +241,15 @@ router.put('/complaints/:id/assign', idParamValidation, async (req, res, next) =
        VALUES ($1, $2, $3, $4, $5)`,
             [complaintId, req.user.id, actionType, `Admin ${actionType} complaint`, false]
         );
+
+        // Send email if a specific worker was assigned
+        if (workerId && workerResult && workerResult.rows.length > 0) {
+            const workerInfo = workerResult.rows[0];
+            const complaintInfo = complaintResult.rows[0];
+            sendWorkerAssignedEmail(workerInfo, complaintInfo).catch(err => 
+                console.error('Failed to send assignment email:', err)
+            );
+        }
 
         res.json({
             success: true,
@@ -256,9 +273,17 @@ router.get('/users', async (req, res, next) => {
         let paramCount = 0;
 
         if (role) {
-            paramCount++;
-            query += ` AND role = $${paramCount}`;
-            params.push(role);
+            const roles = Array.isArray(role) ? role : role.split(',');
+            if (roles.length > 1) {
+                const placeholders = roles.map((_, i) => `$${paramCount + i + 1}`).join(',');
+                query += ` AND role::text IN (${placeholders})`;
+                params.push(...roles);
+                paramCount += roles.length;
+            } else if (roles.length === 1 && roles[0]) {
+                paramCount++;
+                query += ` AND role = $${paramCount}`;
+                params.push(roles[0]);
+            }
         }
 
         if (department) {
@@ -308,18 +333,27 @@ router.post('/users', createUserValidation, async (req, res, next) => {
         const saltRounds = 10;
         const passwordHash = await bcrypt.hash(password, saltRounds);
 
-        // Insert new user
+        // Insert new user — admin-created accounts are pre-verified
         const result = await db.query(
-            `INSERT INTO users (name, email, password_hash, role, department, student_id) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+            `INSERT INTO users (name, email, password_hash, role, department, student_id, email_verified) 
+       VALUES ($1, $2, $3, $4, $5, $6, true) 
        RETURNING id, name, email, role, department, student_id, created_at`,
             [name, email, passwordHash, role, department || null, studentId || null]
         );
 
+        const newUser = result.rows[0];
+
+        // Send welcome email with login info (non-blocking)
+        try {
+            await sendWorkerWelcomeEmail(newUser, req.user.name);
+        } catch (emailErr) {
+            console.error('Failed to send welcome email:', emailErr.message);
+        }
+
         res.status(201).json({
             success: true,
-            message: 'User created successfully',
-            data: { user: result.rows[0] },
+            message: 'User created successfully. A welcome email has been sent.',
+            data: { user: newUser },
         });
     } catch (error) {
         next(error);
@@ -333,7 +367,7 @@ router.post('/users', createUserValidation, async (req, res, next) => {
 router.put('/users/:id', idParamValidation, async (req, res, next) => {
     try {
         const userId = req.params.id;
-        const { name, email, role, department } = req.body;
+        const { name, email, role, department, password } = req.body;
 
         // Check if user exists
         const userResult = await db.query('SELECT id FROM users WHERE id = $1', [userId]);
@@ -345,17 +379,29 @@ router.put('/users/:id', idParamValidation, async (req, res, next) => {
             });
         }
 
+        // If a new password is provided, hash it
+        let passwordClause = '';
+        const params = [name, email, role, department];
+        if (password && password.trim().length >= 6) {
+            const saltRounds = 10;
+            const passwordHash = await bcrypt.hash(password, saltRounds);
+            passwordClause = ', password_hash = $5';
+            params.push(passwordHash);
+        }
+        params.push(userId);
+        const idParam = `$${params.length}`;
+
         // Update user
         const result = await db.query(
             `UPDATE users 
        SET name = COALESCE($1, name), 
            email = COALESCE($2, email), 
            role = COALESCE($3, role), 
-           department = COALESCE($4, department),
+           department = COALESCE($4, department)${passwordClause},
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5
+       WHERE id = ${idParam}
        RETURNING id, name, email, role, department, student_id, updated_at`,
-            [name, email, role, department, userId]
+            params
         );
 
         res.json({
@@ -384,6 +430,9 @@ router.delete('/users/:id', idParamValidation, async (req, res, next) => {
             });
         }
 
+        // Get user info before deleting for the email
+        const userCheck = await db.query('SELECT name, email FROM users WHERE id = $1', [userId]);
+
         // Delete user
         const result = await db.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
 
@@ -392,6 +441,14 @@ router.delete('/users/:id', idParamValidation, async (req, res, next) => {
                 success: false,
                 message: 'User not found',
             });
+        }
+
+        // Notify the user about account deletion
+        if (userCheck.rows.length > 0) {
+            const { name, email } = userCheck.rows[0];
+            sendUserRemovedEmail(email, name).catch(err => 
+                console.error('Failed to send account removal email:', err)
+            );
         }
 
         res.json({
