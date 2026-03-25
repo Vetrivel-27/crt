@@ -40,7 +40,7 @@ The repository is modularly split into two main directories:
 ### Prerequisites
 *   Node.js and npm installed on your machine
 *   A running instance of PostgreSQL
-*   API Keys for Google Generative AI and Groq (if applicable)
+*   API key of Groq SDK
 *   SMTP credentials for sending emails
 
 ### Backend Setup
