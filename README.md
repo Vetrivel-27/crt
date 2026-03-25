@@ -10,7 +10,6 @@ Complaint Resolution Tracker is a comprehensive web application designed to mana
 *   **Email Verification and Notifications:** Automated email verification for new registrations and system notifications using Nodemailer.
 *   **Intelligent Insights:** AI-powered features leveraging Google Generative AI and the Groq SDK for enhanced complaint handling and insights.
 *   **Automated Scheduled Tasks:** Background job processing via node-cron for systematic cleanup and reminders.
-*   **File Uploads:** Support for attaching evidence or relevant documents to complaints using Multer.
 *   **Modern User Interface:** A responsive and accessible frontend built with React and Material-UI (MUI).
 
 ## Tech Stack
@@ -27,7 +26,6 @@ Complaint Resolution Tracker is a comprehensive web application designed to mana
 *   JSON Web Token (JWT) & Bcrypt for security
 *   Node-Cron for background tasks
 *   Nodemailer for email services
-*   Google Generative AI & Groq SDK for artificial intelligence capabilities
 *   Multer for multipart/form-data handling
 
 ## Project Structure
