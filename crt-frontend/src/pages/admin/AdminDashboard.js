@@ -178,7 +178,6 @@ const AdminDashboard = () => {
                 </Link>
             </div>
 
-            {/* Quick Assign Modal */}
             {selectedComplaint && (
                 <div className="modal-overlay" onClick={() => setSelectedComplaint(null)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>

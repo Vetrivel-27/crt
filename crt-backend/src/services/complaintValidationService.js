@@ -1,22 +1,17 @@
 /**
  * Complaint Validation & Auto-Correction Service
- *
  * Compares student-provided category/urgency against AI classification results.
  * Overrides selections when AI confidence exceeds the threshold, and when
  * urgency keywords indicate the student under-reported severity.
- *
  * Rules:
  *  - Category: override if AI differs AND confidence >= MIN_CONFIDENCE_OVERRIDE (default 0.70)
  *  - Urgency:  override ONLY if AI urgency is strictly higher severity than student's
  *              (never downgrades urgency — student saying "critical" is always respected)
  *  - Both:     originals are stored in student_selected_* columns for audit trail
  */
-
 // Urgency severity order (higher index = more severe)
 const URGENCY_LEVELS = ['low', 'medium', 'high', 'critical'];
-
 const urgencySeverity = (level) => URGENCY_LEVELS.indexOf(level);
-
 /**
  * Decide whether to override the student's category.
  * @param {string} studentCat   - What the student selected
@@ -31,7 +26,6 @@ function shouldOverrideCategory(studentCat, aiCat, confidence) {
     const threshold = parseFloat(process.env.MIN_CONFIDENCE_OVERRIDE || '0.70');
     return aiCat !== studentCat && confidence >= threshold;
 }
-
 /**
  * Decide whether to override the student's urgency.
  * Allows both upgrades and downgrades, but requires very high confidence
@@ -43,14 +37,10 @@ function shouldOverrideCategory(studentCat, aiCat, confidence) {
  */
 function shouldOverrideUrgency(studentUrgency, aiUrgency, aiConfidence) {
     if (studentUrgency === aiUrgency) return false;
-    
-    // If student says critical, only allow downgrade if AI is VERY sure (>= 0.85)
     if (studentUrgency === 'critical' && aiUrgency !== 'critical') {
         const downgradeThreshold = 0.85; 
         return aiConfidence >= downgradeThreshold;
     }
-
-    // Otherwise, allow standard overrides (upgrades, or downgrades from High/Medium)
     return true;
 }
 
@@ -62,7 +52,6 @@ function shouldOverrideUrgency(studentUrgency, aiUrgency, aiConfidence) {
  */
 function generateCorrectionReason(changes, confidence) {
     const parts = [];
-
     if (changes.category) {
         parts.push(
             `Category adjusted from "${changes.category.from}" to "${changes.category.to}".`
@@ -95,13 +84,11 @@ function validateAndCorrectComplaint(studentData, aiResult) {
     let finalCategory = studentData.category;
     let finalUrgency = studentData.urgency;
     const changes = {};
-
     // Category check
     if (shouldOverrideCategory(studentData.category, aiResult.category, aiResult.confidence)) {
         changes.category = { from: studentData.category, to: aiResult.category };
         finalCategory = aiResult.category;
     }
-
     // Urgency check (allowing both upgrade/downgrade with intelligence)
     if (shouldOverrideUrgency(studentData.urgency, aiResult.urgency, aiResult.confidence)) {
         changes.urgency = { from: studentData.urgency, to: aiResult.urgency };

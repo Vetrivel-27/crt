@@ -76,13 +76,12 @@ const NewComplaint = () => {
         }
     };
 
-    // ── Correction Notice Screen ─────────────────────────────────────────────
+    // Correction notice page
     if (correction) {
         return (
             <div className="new-complaint-container">
                 <div className="new-complaint-card card">
                     <div className="correction-notice">
-                        {/* <div className="correction-icon">🤖</div> */}
                         <h2>Complaint Submitted!</h2>
                         <p className="correction-intro">
                             Your complaint was reviewed, and a small adjustment was made to its category or urgency to ensure
@@ -130,7 +129,7 @@ const NewComplaint = () => {
         );
     }
 
-    // ── Normal Form ──────────────────────────────────────────────────────────
+    // Complaint form
     return (
         <div className="new-complaint-container">
             <div className="new-complaint-card card">

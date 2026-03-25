@@ -103,9 +103,7 @@ CREATE TRIGGER update_complaints_updated_at BEFORE UPDATE ON complaints
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert default admin user (password: admin123)
--- Password hash for 'admin123' with bcrypt (10 rounds)
+
 INSERT INTO users (name, email, password_hash, role, department) VALUES
 ('System Admin', 'admin@crt.edu', '$2b$10$rKvVPZQGvGGGqH8qN8qN8eYxYxYxYxYxYxYxYxYxYxYxYxYxYxYxY', 'admin', 'Administration');
 
--- Note: The above password hash is a placeholder. 
--- In production, generate proper bcrypt hash using the actual password.

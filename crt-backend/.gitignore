@@ -17,3 +17,10 @@ coverage/
 
 clean-db.js
 seed_departments.js
+test-complaints-api.js
+test-cron.js
+test-users-api.js
+test-verify.js
+migrate-auto-correction.sql
+migrate-email-verification.sql
+migrate-escalation.sql

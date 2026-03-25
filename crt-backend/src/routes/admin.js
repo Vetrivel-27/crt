@@ -76,8 +76,6 @@ router.get('/overview', async (req, res, next) => {
         const allComplaintsResult = await db.query(
             'SELECT id, title, category, status, urgency, created_at, updated_at FROM complaints'
         );
-
-        // Generate AI insights
         const aiAnalytics = await aiService.generateAnalytics(allComplaintsResult.rows);
 
         const overview = {

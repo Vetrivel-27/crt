@@ -51,10 +51,8 @@ if (process.env.NODE_ENV !== 'test') {
 // 404 handler
 app.use(notFoundHandler);
 
-// Error handler (must be last)
+// Error handler
 app.use(errorHandler);
-
-// Start server
 app.listen(PORT, () => {
     console.log('='.repeat(50));
     console.log('Complaint Resolution Tracker');

@@ -50,7 +50,6 @@ async function sendVerificationEmail(user, token) {
  */
 async function sendWorkerWelcomeEmail(user, creatorName) {
     const loginUrl = `${FRONTEND_URL}/login`;
-
     await transporter.sendMail({
         from: FROM,
         to: user.email,
@@ -84,7 +83,6 @@ async function sendWorkerWelcomeEmail(user, creatorName) {
  */
 async function sendComplaintResolvedEmail(student, complaint) {
     const complaintUrl = `${FRONTEND_URL}/student/complaints/${complaint.id}`;
-
     await transporter.sendMail({
         from: FROM,
         to: student.email,

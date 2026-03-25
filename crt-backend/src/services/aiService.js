@@ -1,7 +1,6 @@
 const db = require('../config/database');
 const Groq = require('groq-sdk');
 
-// Groq client — only initialised if API key is set
 const groqClient = process.env.GROQ_API_KEY
     ? new Groq({ apiKey: process.env.GROQ_API_KEY })
     : null;
@@ -14,17 +13,7 @@ const VALID_CATEGORIES = [
 ];
 const VALID_URGENCIES = ['low', 'medium', 'high', 'critical'];
 
-/**
- * Rule-Based AI Service for the Complaint Resolution Tracker
- *
- * No external AI/ML API required. All intelligence is rule-based:
- *  1. classifyComplaint  — weighted keyword scoring per category + urgency markers
- *  2. suggestRouting     — department match + DB load-balanced worker assignment
- *  3. generateSummary    — structured template from complaint fields + history
- *  4. generateAnalytics  — pure JS aggregation with trend comparison
- */
-
-// ─── Category Keyword Dictionary ────────────────────────────────────────────
+//Category Keyword Dictionary 
 // Each category has a list of keywords. Words that appear in the text are
 // scored (each word contributes 1 point). The highest-scoring category wins.
 const CATEGORY_KEYWORDS = {
@@ -83,7 +72,7 @@ const CATEGORY_KEYWORDS = {
     ],
 };
 
-// ─── Urgency Marker Dictionary ───────────────────────────────────────────────
+//  Urgency Marker Dictionary 
 // Checked in order — first match wins. Weight = specificity.
 const URGENCY_MARKERS = {
     critical: [
@@ -103,7 +92,7 @@ const URGENCY_MARKERS = {
     // default = 'medium' if none matched
 };
 
-// ─── Category → Department Mapping ──────────────────────────────────────────
+//  Category to Department Mapping 
 const CATEGORY_TO_DEPARTMENT = {
     'Hostel & Accommodation':      'Hostel Management',
     'Food & Mess':                 'Mess Committee',
@@ -118,7 +107,7 @@ const CATEGORY_TO_DEPARTMENT = {
     'General':                     'Other',
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+//  Helpers 
 
 /**
  * Score a piece of text against a keyword list.
@@ -145,9 +134,8 @@ function detectUrgency(text) {
     return 'medium';
 }
 
-/**
- * Format a duration (in seconds) as a human-readable string.
- */
+
+// Format a duration (in seconds) as a human-readable string.
 function formatDuration(seconds) {
     if (!seconds || isNaN(seconds)) return 'N/A';
     const days = Math.floor(seconds / 86400);
@@ -166,13 +154,11 @@ function formatDate(dateStr) {
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// ─── Main Service Object ─────────────────────────────────────────────────────
-
+//  Main Service Object 
 const aiService = {
 
     /**
      * Classify a complaint based on its text.
-     *
      * Uses weighted keyword scoring across all categories.
      * The category with the highest score wins; ties default to 'General'.
      * Urgency is detected from urgency marker keywords.
@@ -182,40 +168,40 @@ const aiService = {
      * @returns {Promise<{ category: string, urgency: string, confidence: number }>}
      */
     async classifyComplaint(text, metadata = {}) {
-        // ── Try Groq (Llama 3.3) first ────────────────────────────────────
+        //  Try Groq (Llama 3.3) first 
         if (groqClient) {
             try {
                 const prompt = `You are a complaint classifier for a college complaint management system.
-Classify the following complaint into exactly ONE of these categories:
-${VALID_CATEGORIES.map(c => `- ${c}`).join('\n')}
+                Classify the following complaint into exactly ONE of these categories:
+                ${VALID_CATEGORIES.map(c => `- ${c}`).join('\n')}
 
-Assign urgency from: low, medium, high, critical
-Provide a confidence score (0.00 to 1.00) reflecting how certain you are.
+                Assign urgency from: low, medium, high, critical
+                Provide a confidence score (0.00 to 1.00) reflecting how certain you are.
 
-Rules:
-- "Academic" covers exams, grades, professors, classes, and curriculum.
-- "Hostel & Accommodation" covers rooms, roommates, wardens, blocks, and hostel facilities.
-- "Food & Mess" covers mess quality, hygiene, menu, and canteen issues.
-- "Library" covers books, librarian conduct, and study space.
-- "Transportation" covers college buses, routes, and drivers.
-- "Fees & Finance" covers payments, refunds, and scholarships.
-- "Infrastructure" covers facilities, wifi, electricity, water, broken equipment, and pest control (mosquitoes, fumigation, cleaning).
-- "Harassment & Discrimination" covers ragging, bullying, and abuse.
-- "Health & Medical" covers illness, injury, medical emergencies, and skin issues (like mosquito bites).
-- "Sports & Extracurricular" covers gym, sports grounds, and college events.
-- "General" is only for complaints that genuinely don't fit elsewhere.
-- Urgency "critical" = immediate danger, severe health risk, or massive infrastructure failure.
-- Urgency "high" = urgent impact, missing essential service, or safety concern.
-- Urgency "medium" = significant inconvenience or repair.
-- Urgency "low" = minor issue or suggestion.
-- NOTE: "Critical" medical issues include: High fever (>102°F), potential viral outbreaks (Viral Fever), chest pain, severe injury, or contagious diseases.
-- NOTE: If a complaint is about a mosquito bite, classify it as "Health & Medical" (Low/Medium). If it's about seeing many mosquitoes in a room, it's "Hostel & Accommodation" (Medium/High).
+                Rules:
+                - "Academic" covers exams, grades, professors, classes, and curriculum.
+                - "Hostel & Accommodation" covers rooms, roommates, wardens, blocks, and hostel facilities.
+                - "Food & Mess" covers mess quality, hygiene, menu, and canteen issues.
+                - "Library" covers books, librarian conduct, and study space.
+                - "Transportation" covers college buses, routes, and drivers.
+                - "Fees & Finance" covers payments, refunds, and scholarships.
+                - "Infrastructure" covers facilities, wifi, electricity, water, broken equipment, and pest control (mosquitoes, fumigation, cleaning).
+                - "Harassment & Discrimination" covers ragging, bullying, and abuse.
+                - "Health & Medical" covers illness, injury, medical emergencies, and skin issues (like mosquito bites).
+                - "Sports & Extracurricular" covers gym, sports grounds, and college events.
+                - "General" is only for complaints that genuinely don't fit elsewhere.
+                - Urgency "critical" = immediate danger, severe health risk, or massive infrastructure failure.
+                - Urgency "high" = urgent impact, missing essential service, or safety concern.
+                - Urgency "medium" = significant inconvenience or repair.
+                - Urgency "low" = minor issue or suggestion.
+                - NOTE: "Critical" medical issues include: High fever (>102°F), potential viral outbreaks (Viral Fever), chest pain, severe injury, or contagious diseases.
+                - NOTE: If a complaint is about a mosquito bite, classify it as "Health & Medical" (Low/Medium). If it's about seeing many mosquitoes in a room, it's "Hostel & Accommodation" (Medium/High).
 
-Respond ONLY with this exact JSON:
-{"category":"...","urgency":"...","confidence":0.XX}
+                Respond ONLY with this exact JSON:
+                {"category":"...","urgency":"...","confidence":0.XX}
 
-Complaint Title: ${metadata.title || ''}
-Complaint Description: ${text}`;
+                Complaint Title: ${metadata.title || ''}
+                Complaint Description: ${text}`;
 
                 const chatCompletion = await groqClient.chat.completions.create({
                     messages: [{ role: 'user', content: prompt }],
@@ -244,7 +230,7 @@ Complaint Description: ${text}`;
             }
         }
 
-        // ── Rule-based fallback ───────────────────────────────────────────
+        //  Rule-based fallback 
         const combined = `${text} ${metadata.title || ''}`;
 
         let bestCategory = 'General';
@@ -290,7 +276,6 @@ Complaint Description: ${text}`;
     async suggestRouting(complaint, availableWorkers = []) {
         const department = CATEGORY_TO_DEPARTMENT[complaint.category]
             || 'General Administration';
-
         if (availableWorkers.length === 0) {
             return {
                 workerId: null,
@@ -298,7 +283,6 @@ Complaint Description: ${text}`;
                 reason: `Routed to ${department} (no workers available for auto-assignment)`,
             };
         }
-
         // Fetch current workload for each available worker
         let workerLoads = {};
         try {
@@ -318,7 +302,6 @@ Complaint Description: ${text}`;
             // If DB query fails, proceed with 0 load for all
             console.error('Load-balance query failed, falling back to first match:', err.message);
         }
-
         // Prefer workers in the matched department
         const departmentWorkers = availableWorkers.filter(
             w => w.department === department
@@ -333,7 +316,6 @@ Complaint Description: ${text}`;
             const bestLoad = workerLoads[best.id] || 0;
             return load < bestLoad ? w : best;
         });
-
         const currentLoad = workerLoads[chosen.id] || 0;
         const poolNote = departmentWorkers.length > 0
             ? `from ${department}`
@@ -348,10 +330,8 @@ Complaint Description: ${text}`;
 
     /**
      * Generate a structured text summary for a complaint.
-     *
      * No NLP required — builds a factual summary from the complaint fields
      * and history entries.
-     *
      * @param {object} complaint - Complaint row
      * @param {Array}  history   - Array of complaint_history rows
      * @returns {Promise<string>}
@@ -402,9 +382,7 @@ Complaint Description: ${text}`;
 
     /**
      * Extract a standardized 1-3 word topic from a complaint.
-     * 
      * Uses Groq to condense a description into a specific "Subject/Location" pivot.
-     * 
      * @param {string} text - Complaint description
      * @param {string} category - Complaint category
      * @returns {Promise<string>} - e.g. "WiFi/Library", "Leak/Room 302"
@@ -414,25 +392,22 @@ Complaint Description: ${text}`;
             // Fallback: Just use the category if AI is disabled
             return category;
         }
-
         try {
             const prompt = `You are a data analyst for a college.
-Extract a 1-3 word "Standardized Topic" from this complaint that can be used to group it with identical issues.
-Be specific about the problem and location if possible (e.g., "WiFi/Library", "Fan/Room 201", "Professor/MathDept", "Leak/Room 302").
+                Extract a 1-3 word "Standardized Topic" from this complaint that can be used to group it with identical issues.
+                Be specific about the problem and location if possible (e.g., "WiFi/Library", "Fan/Room 201", "Professor/MathDept", "Leak/Room 302").
 
-Rules:
-- Category: ${category}
-- Output: ONLY the 1-3 word string. No punctuation.
-- Goal: If 3 students report the exact same thing, they must result in the same output.
+                Rules:
+                - Category: ${category}
+                - Output: ONLY the 1-3 word string. No punctuation.
+                - Goal: If 3 students report the exact same thing, they must result in the same output.
 
-Complaint: ${text}`;
-
+                Complaint: ${text}`;
             const chatCompletion = await groqClient.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],
                 model: 'llama-3.3-70b-versatile',
                 temperature: 0.1,
             });
-
             const topic = chatCompletion.choices[0]?.message?.content?.trim() || 'General';
             console.log(`[Groq] Extracted Topic: "${topic}" for Category: "${category}"`);
             return topic;
@@ -444,13 +419,11 @@ Complaint: ${text}`;
 
     /**
      * Generate dashboard analytics from all complaints.
-     *
      * Pure JavaScript aggregation — no ML needed.
      * Produces:
      *  - insights:        string[] — key observations
      *  - trends:          object   — breakdowns by status, category, urgency, monthly
      *  - recommendations: string[] — action suggestions based on data patterns
-     *
      * @param {Array} complaints - All complaint rows
      * @returns {Promise<{ insights: string[], trends: object, recommendations: string[] }>}
      */
@@ -465,7 +438,7 @@ Complaint: ${text}`;
             };
         }
 
-        // ── Aggregations ───────────────────────────────────────────────────
+        //  Aggregations 
         const byStatus = {};
         const byCategory = {};
         const byUrgency = {};
@@ -523,7 +496,7 @@ Complaint: ${text}`;
             ? (((byStatus['resolved'] || 0) + (byStatus['closed'] || 0)) / total * 100).toFixed(1)
             : 0;
 
-        // ── Month-over-month trend ─────────────────────────────────────────
+        //  Month-over-month trend 
         const months = Object.keys(monthly).sort();
         let trendNote = '';
         if (months.length >= 2) {
@@ -537,7 +510,7 @@ Complaint: ${text}`;
                     : 'Complaint volume is stable month-over-month.';
         }
 
-        // ── Insights ──────────────────────────────────────────────────────
+        //  Insights 
         const insights = [
             `Total of ${total} complaint(s) tracked across the system.`,
             `Overall resolution rate: ${resolutionRate}%.`,
@@ -556,7 +529,7 @@ Complaint: ${text}`;
             trendNote || null,
         ].filter(Boolean);
 
-        // ── Recommendations ───────────────────────────────────────────────
+        //  Recommendations 
         const recommendations = [];
 
         if (overdueCount > 0) {

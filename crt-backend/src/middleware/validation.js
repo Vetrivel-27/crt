@@ -1,8 +1,7 @@
 const { body, param, query, validationResult } = require('express-validator');
 
-/**
- * Middleware to check validation results
- */
+// Middleware to check validation results
+
 const validate = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -15,9 +14,7 @@ const validate = (req, res, next) => {
     next();
 };
 
-/**
- * Validation rules for user registration
- */
+//Validation rules for user registration
 const registerValidation = [
     body('name')
         .trim()
@@ -38,9 +35,7 @@ const registerValidation = [
     validate
 ];
 
-/**
- * Validation rules for login
- */
+//Validation rules for login
 const loginValidation = [
     body('email')
         .trim()
@@ -50,9 +45,7 @@ const loginValidation = [
     validate
 ];
 
-/**
- * Validation rules for creating a complaint
- */
+// Validation rules for creating a complaint
 const createComplaintValidation = [
     body('title')
         .trim()
@@ -74,9 +67,7 @@ const createComplaintValidation = [
     validate
 ];
 
-/**
- * Validation rules for updating complaint status
- */
+ //Validation rules for updating complaint status
 const updateStatusValidation = [
     body('status')
         .notEmpty().withMessage('Status is required')
@@ -87,9 +78,7 @@ const updateStatusValidation = [
     validate
 ];
 
-/**
- * Validation rules for adding notes
- */
+// Validation rules for adding notes
 const addNoteValidation = [
     body('note')
         .trim()
@@ -101,9 +90,9 @@ const addNoteValidation = [
     validate
 ];
 
-/**
- * Validation rules for feedback
- */
+
+//Validation rules for feedback
+
 const feedbackValidation = [
     body('rating')
         .notEmpty().withMessage('Rating is required')
@@ -113,10 +102,8 @@ const feedbackValidation = [
         .trim(),
     validate
 ];
-
-/**
- * Validation rules for creating a user (admin)
- */
+ //Validation rules for creating a user (admin)
+ 
 const createUserValidation = [
     body('name')
         .trim()
@@ -142,9 +129,7 @@ const createUserValidation = [
     validate
 ];
 
-/**
- * Validation for ID parameters
- */
+// Validation for ID parameters
 const idParamValidation = [
     param('id')
         .isInt({ min: 1 }).withMessage('Invalid ID'),

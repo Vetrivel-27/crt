@@ -16,7 +16,7 @@ const HEAD_EMAILS = {
 
 const CATEGORY_TO_DEPARTMENT = {
     'Hostel & Accommodation': 'Hostel',
-    'Food & Mess': 'Other', // Assuming Mess falls under General/Other for heads, or we can map dynamically
+    'Food & Mess': 'Other',
     'Academic': 'Academic',
     'Library': 'Library',
     'Transportation': 'Transport',
@@ -28,12 +28,9 @@ const CATEGORY_TO_DEPARTMENT = {
     'General': 'Other',
 };
 
-/**
- * Initializes all background jobs.
- */
+// Initializes all background jobs.
 function initCronJobs() {
     console.log('[Cron] Initializing background jobs...');
-
     // Run every hour at minute 0
     cron.schedule('0 * * * *', async () => {
         console.log('[Cron] Running critical escalation check...');
@@ -48,23 +45,18 @@ function initCronJobs() {
                 AND created_at <= NOW() - INTERVAL '12 hours'
             `;
             const result = await db.query(query);
-
             if (result.rowCount > 0) {
                 console.log(`[Cron] Found ${result.rowCount} critical complaint(s) exceeding 12 hours.`);
-
                 for (const complaint of result.rows) {
                     // Update the DB immediately
                     await db.query(
                         'UPDATE complaints SET is_escalated = true WHERE id = $1',
                         [complaint.id]
                     );
-
                     // Determine recipient
                     const mappedDept = CATEGORY_TO_DEPARTMENT[complaint.category] || 'Other';
                     const headEmail = HEAD_EMAILS[mappedDept] || 'admin@crt.edu'; // fallback to general admin
-
                     console.log(`[Cron] Escalated complaint #${complaint.id}. Emailing ${headEmail}`);
-                    
                     // Send Email Notification
                     sendComplaintEscalatedEmail(headEmail, complaint).catch(err => {
                         console.error(`[Cron] Failed to email Department Head for complaint #${complaint.id}`, err);

@@ -18,7 +18,6 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     }
 
     if (allowedRoles && !allowedRoles.includes(user.role)) {
-        // Redirect to appropriate dashboard based on role
         const dashboards = {
             student: '/student/dashboard',
             worker: '/worker/dashboard',

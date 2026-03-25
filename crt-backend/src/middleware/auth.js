@@ -16,12 +16,10 @@ const authMiddleware = (req, res, next) => {
                 message: 'No token provided. Authorization header must be in format: Bearer <token>'
             });
         }
-
-        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+        const token = authHeader.substring(7);
 
         // Verify token
         const decoded = jwt.verify(token, jwtConfig.secret);
-
         // Attach user info to request
         req.user = {
             id: decoded.id,

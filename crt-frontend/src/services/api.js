@@ -2,7 +2,6 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-// Create axios instance
 const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
@@ -29,8 +28,7 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Only redirect if there was an existing token (expired session),
-            // NOT during a login attempt where 401 just means wrong credentials.
+            // Only redirect if there was an existing token (expired session), not during a login attempt where 401 just means wrong credentials.
             const hadToken = localStorage.getItem('token');
             localStorage.removeItem('token');
             localStorage.removeItem('user');

@@ -170,8 +170,7 @@
         grid-template-columns: 1fr;
     }
 }
-
-/* ── Auto-Correction Banner ─────────────────────────────────────── */
+/* Auto correction displays */
 .auto-correction-banner {
     display: flex;
     gap: var(--spacing-md);
@@ -236,4 +235,4 @@
 .comparison-corrected {
     color: #2d6a35;
     font-weight: 600;
-}
+}

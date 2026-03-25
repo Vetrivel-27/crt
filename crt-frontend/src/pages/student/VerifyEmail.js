@@ -36,13 +36,6 @@ const VerifyEmail = () => {
             });
     }, []);
 
-    const icons = {
-        verifying: '⏳',
-        success: '✅',
-        expired: '⌛',
-        invalid: '❌',
-    };
-
     const titles = {
         verifying: 'Verifying your email...',
         success: 'Email Verified!',
@@ -53,7 +46,6 @@ const VerifyEmail = () => {
     return (
         <div className="login-container">
             <div className="login-card card" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '3rem', marginBottom: '16px' }}>{icons[status]}</div>
                 <h2 style={{ marginBottom: '12px' }}>{titles[status]}</h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '28px' }}>{message}</p>
 

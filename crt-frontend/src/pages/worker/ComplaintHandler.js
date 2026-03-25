@@ -110,12 +110,12 @@ const ComplaintHandler = () => {
                     <p className="description">{complaint.description}</p>
                 </div>
 
-                {/*{complaint.ai_summary && (
+                {complaint.ai_summary && (
                     <div className="ai-summary">
                         <h4>🤖 AI Summary</h4>
                         <p>{complaint.ai_summary}</p>
                     </div>
-                )}*/}
+                )}
             </div>
 
             <div className="card mt-3">

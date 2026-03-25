@@ -53,7 +53,7 @@
     }
 }
 
-/* ── Correction Notice Screen ───────────────────────────────────── */
+/* Correction notice page */
 .correction-notice {
     text-align: center;
     padding: var(--spacing-lg) 0;
@@ -141,4 +141,4 @@
     gap: var(--spacing-md);
     justify-content: center;
     flex-wrap: wrap;
-}
+}

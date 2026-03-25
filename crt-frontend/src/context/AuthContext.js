@@ -61,7 +61,6 @@ export const AuthProvider = ({ children }) => {
     const register = async (data) => {
         try {
             const response = await apiService.register(data);
-            // Registration now sends a verification email — no auto-login
             return { success: true, message: response.data.message };
         } catch (error) {
             return {

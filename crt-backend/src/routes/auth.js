@@ -9,7 +9,6 @@ const { sendVerificationEmail } = require('../services/emailService');
 
 const router = express.Router();
 
-// Helper: generate a secure random token
 function generateToken() {
     return crypto.randomBytes(32).toString('hex');
 }
@@ -58,7 +57,7 @@ router.post('/register', registerValidation, async (req, res, next) => {
 
         const user = result.rows[0];
 
-        // Send verification email (non-blocking — don't fail the request if email fails)
+        // Send verification email
         try {
             await sendVerificationEmail(user, token);
         } catch (emailErr) {
@@ -119,10 +118,7 @@ router.get('/verify-email', async (req, res, next) => {
             });
         }
 
-        // Mark as verified. We keep the token for now so that subsequent 
-        // calls (race conditions or security scanners) can still identify 
-        // the user and return a "Success" message instead of "Invalid Link".
-        // The token effectively "expires" via token_expires_at anyway.
+        // Mark as verified. We "expires" via token_expires_at anyway.
         await db.query(
             'UPDATE users SET email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
             [user.id]
@@ -150,8 +146,6 @@ router.post('/resend-verification', async (req, res, next) => {
             'SELECT id, name, email, email_verified, role FROM users WHERE email = $1',
             [email]
         );
-
-        // Always respond with the same message to prevent email enumeration
         const genericOk = { success: true, message: 'If that email is registered and unverified, a new link has been sent.' };
 
         if (result.rows.length === 0) return res.json(genericOk);
