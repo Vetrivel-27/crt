@@ -1,10 +1,6 @@
 const jwt = require('jsonwebtoken');
 const jwtConfig = require('../config/jwt');
 
-/**
- * Authentication middleware to verify JWT tokens
- * Attaches user information to req.user if valid
- */
 const authMiddleware = (req, res, next) => {
     try {
         // Get token from Authorization header

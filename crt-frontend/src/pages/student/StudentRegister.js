@@ -42,15 +42,13 @@ const StudentRegister = () => {
         });
 
         if (result.success) {
-            // Don't navigate — show email verification prompt
             setRegistered(true);
-        } else {
+        }
+        else {
             setError(result.message);
             setLoading(false);
         }
     };
-
-    // Success state — waiting for email verification
     if (registered) {
         return (
             <div className="login-container">

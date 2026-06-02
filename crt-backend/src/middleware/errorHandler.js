@@ -29,9 +29,7 @@ const errorHandler = (err, req, res, next) => {
     });
 };
 
-/**
- * 404 Not Found handler
- */
+//404 handler
 const notFoundHandler = (req, res) => {
     res.status(404).json({
         success: false,
